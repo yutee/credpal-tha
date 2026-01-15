@@ -10,7 +10,7 @@ let appReady = false;
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.json({ message: "Welcome to CredPal API" });
+  res.json({ message: "This is CredPal API" });
 });
 
 app.get("/health", (req, res) => {
