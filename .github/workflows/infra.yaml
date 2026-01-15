@@ -25,6 +25,7 @@ jobs:
           exclude-workflow-initiator-as-approver: false
 
   terraform:
+    needs: approval
     runs-on: ubuntu-latest
     
     defaults:

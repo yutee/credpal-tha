@@ -13,6 +13,10 @@ app.get("/", (req, res) => {
   res.json({ message: "Welcome to CredPal API" });
 });
 
+app.get("/error", (req, res) => {
+  res.json({ message: "Dummy endpoint to test updates" });
+});
+
 app.get("/health", (req, res) => {
   if (!appReady || !isDbConnected()) {
     return res.status(503).json({

@@ -58,14 +58,12 @@ jobs:
           ssh -i ${{ env.SSH_KEY_PATH }} \
             -o StrictHostKeyChecking=no \
             ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
-
-            sudo mkdir -p /opt/app
-            
-            sudo mv ~/docker-compose.yml /opt/app/docker-compose.yml
-            
+            sudo mv /tmp/docker-compose.yaml /opt/app/docker-compose.yml
             sudo chown ubuntu:ubuntu /opt/app/docker-compose.yml
             
             cd /opt/app
+            export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+            
             docker-compose pull
             docker-compose up -d
             
