@@ -71,11 +71,12 @@ jobs:
             curl -f http://localhost:3000/health || exit 1
           EOF
 
-      - name: Verify deployment
-        run: |
-          sleep 5
-          curl -f https://${{ secrets.DOMAIN_NAME }}/health
-          echo "Public endpoint verified"
+      # useful in prod, but will fail cause using local dns    
+      # - name: Verify deployment
+      #   run: |
+      #     sleep 5
+      #     curl -f https://${{ secrets.DOMAIN_NAME }}/health
+      #     echo "Public endpoint verified"
 
       - name: Cleanup
         if: always()
