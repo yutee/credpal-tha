@@ -48,3 +48,9 @@ variable "letsencrypt_email" {
   description = "Email for Let's Encrypt certificate notifications"
   type        = string
 }
+
+variable "github_repo" {
+  description = "Github repo - used for GHCR too"
+  type        = string
+  default     = "yutee/credpal-tha"
+}

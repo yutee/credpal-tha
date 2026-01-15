@@ -30,7 +30,7 @@ resource "aws_instance" "app_server" {
     domain_name       = var.domain_name
     db_password       = var.db_password
     letsencrypt_email = var.letsencrypt_email
-    github_repo       = "yutee/credpal-tha"
+    github_repo       = var.github_repo
   })
 
   user_data_replace_on_change = true

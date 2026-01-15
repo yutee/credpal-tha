@@ -15,7 +15,7 @@ output "ssh_command" {
 
 output "domain_dns_record" {
   description = "DNS A record to create"
-  value       = "Create A record: ${var.domain_name} -> ${aws_eip.app_server.public_ip}"
+  value       = "Create A record or update /etc/hosts file: ${var.domain_name} -> ${aws_eip.app_server.public_ip}"
 }
 
 output "instance_state" {
