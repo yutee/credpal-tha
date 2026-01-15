@@ -1,0 +1,76 @@
+name: Deploy Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for deployment'
+        required: true
+        type: string
+
+env:
+  SSH_KEY_PATH: /tmp/deploy_key
+
+jobs:
+  approval:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Manual Approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
+          issue-title: "Deploy to Production"
+          issue-body: |
+            **Deployment Request**
+            
+            Triggered by: @${{ github.actor }}
+            Reason: ${{ github.event.inputs.reason }}
+            
+            Please review and approve this deployment.
+
+  deploy:
+    needs: approval
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH Key
+        run: |
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ${{ env.SSH_KEY_PATH }}
+          chmod 600 ${{ env.SSH_KEY_PATH }}
+
+      - name: Copy docker-compose to server
+        run: |
+          scp -i ${{ env.SSH_KEY_PATH }} \
+            -o StrictHostKeyChecking=no \
+            docker/docker-compose.yaml \
+            ubuntu@${{ secrets.EC2_HOST }}:/opt/app/docker-compose.yml
+
+      - name: Deploy application
+        run: |
+          ssh -i ${{ env.SSH_KEY_PATH }} \
+            -o StrictHostKeyChecking=no \
+            ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+            cd /opt/app
+            docker-compose pull
+            docker-compose up -d
+            docker-compose ps
+            
+            echo "Waiting for health check..."
+            sleep 10
+            curl -f http://localhost:3000/health || exit 1
+            echo "Deployment successful"
+          EOF
+
+      - name: Verify deployment
+        run: |
+          sleep 5
+          curl -f https://${{ secrets.DOMAIN_NAME }}/health
+          echo "Public endpoint verified"
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ${{ env.SSH_KEY_PATH }}
