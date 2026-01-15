@@ -13,6 +13,10 @@ app.get("/", (req, res) => {
   res.json({ message: "This is CredPal API" });
 });
 
+app.get("/enpoint", (req, res) => {
+  res.json({ message: "Just another endpoint" });
+});
+
 app.get("/health", (req, res) => {
   if (!appReady || !isDbConnected()) {
     return res.status(503).json({
