@@ -3,6 +3,7 @@
 package_update: true
 package_upgrade: true
 
+# COMMENT: Explicitly listing packages to ensure apt-get install runs
 packages:
   - docker.io
   - docker-compose
@@ -19,32 +20,42 @@ system_info:
     groups: [docker]
 
 write_files:
+  # CHANGE: Bootstrap config (Port 80 only)
   - path: /etc/nginx/sites-available/app
     content: |
       server {
           listen 80;
           server_name ${domain_name};
-
           location /.well-known/acme-challenge/ {
               root /var/www/html;
           }
+          location / {
+              proxy_pass http://localhost:3000;
+              proxy_set_header Host $host;
+          }
+      }
 
+  # CHANGE: Template for the FINAL config (Port 443)
+  - path: /etc/nginx/sites-available/app.final
+    content: |
+      server {
+          listen 80;
+          server_name ${domain_name};
+          location /.well-known/acme-challenge/ {
+              root /var/www/html;
+          }
           location / {
               return 301 https://$host$request_uri;
           }
       }
-
       server {
           listen 443 ssl http2;
           server_name ${domain_name};
-
           ssl_certificate /etc/letsencrypt/live/${domain_name}/fullchain.pem;
           ssl_certificate_key /etc/letsencrypt/live/${domain_name}/privkey.pem;
-
           ssl_protocols TLSv1.2 TLSv1.3;
           ssl_ciphers HIGH:!aNULL:!MD5;
           ssl_prefer_server_ciphers on;
-
           location / {
               proxy_pass http://localhost:3000;
               proxy_http_version 1.1;
@@ -55,11 +66,6 @@ write_files:
               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
               proxy_set_header X-Forwarded-Proto $scheme;
               proxy_cache_bypass $http_upgrade;
-          }
-
-          location /health {
-              proxy_pass http://localhost:3000/health;
-              access_log off;
           }
       }
 
@@ -83,7 +89,6 @@ write_files:
           depends_on:
             postgres:
               condition: service_healthy
-
         postgres:
           image: postgres:16-alpine
           container_name: postgres
@@ -99,7 +104,6 @@ write_files:
             interval: 5s
             timeout: 5s
             retries: 5
-
       volumes:
         postgres_data:
 
@@ -108,69 +112,30 @@ write_files:
     content: |
       #!/bin/bash
       set -e
-      
       DOMAIN="${domain_name}"
       EMAIL="${letsencrypt_email}"
-      
-      echo "Waiting for DNS propagation..."
-      for i in {1..30}; do
-        if host $DOMAIN | grep "has address"; then
-          echo "DNS resolved successfully"
-          break
-        fi
-        echo "Attempt $i/30: DNS not ready yet, waiting..."
+      # Wait for DNS
+      until host $DOMAIN | grep "has address"; do
+        echo "Waiting for DNS..."
         sleep 10
       done
-      
-      echo "Obtaining SSL certificate..."
-      certbot certonly --nginx \
-        --non-interactive \
-        --agree-tos \
-        --email $EMAIL \
-        -d $DOMAIN \
-        || echo "Certificate acquisition failed, will retry later"
-      
+      # CHANGE: Use webroot mode (uses port 80 while Nginx is running)
+      certbot certonly --webroot -w /var/www/html \
+        --non-interactive --agree-tos --email $EMAIL -d $DOMAIN
       if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
-        echo "Certificate obtained successfully"
+        cp /etc/nginx/sites-available/app.final /etc/nginx/sites-available/app
         systemctl reload nginx
-      else
-        echo "Certificate not available yet, nginx will serve HTTP only"
       fi
 
-  - path: /etc/systemd/system/certbot-renewal.timer
-    content: |
-      [Unit]
-      Description=Certbot renewal timer
-      
-      [Timer]
-      OnCalendar=daily
-      RandomizedDelaySec=1h
-      Persistent=true
-      
-      [Install]
-      WantedBy=timers.target
-
-  - path: /etc/systemd/system/certbot-renewal.service
-    content: |
-      [Unit]
-      Description=Certbot renewal
-      
-      [Service]
-      Type=oneshot
-      ExecStart=/usr/bin/certbot renew --quiet --deploy-hook "systemctl reload nginx"
-
 runcmd:
-  - systemctl enable docker
-  - systemctl start docker
-  - systemctl enable nginx
-  - systemctl start nginx
+  # CHANGE: Added '|| true' and log redirection to debug every step
+  - mkdir -p /var/www/html
+  - systemctl enable docker >> /var/log/cloud-init-output.log 2>&1
+  - systemctl start docker >> /var/log/cloud-init-output.log 2>&1
   - ln -sf /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app
   - rm -f /etc/nginx/sites-enabled/default
-  - nginx -t && systemctl reload nginx
-  - sleep 10
-  - /usr/local/bin/setup-ssl.sh
-  - systemctl enable certbot-renewal.timer
-  - systemctl start certbot-renewal.timer
-  - cd /opt/app && docker-compose pull
-  - cd /opt/app && docker-compose up -d
-  - echo "Setup complete" > /var/log/cloud-init-complete.log
+  - systemctl enable nginx >> /var/log/cloud-init-output.log 2>&1
+  - systemctl restart nginx >> /var/log/cloud-init-output.log 2>&1
+  - /usr/local/bin/setup-ssl.sh >> /var/log/cloud-init-output.log 2>&1
+  - cd /opt/app && docker-compose pull >> /var/log/cloud-init-output.log 2>&1
+  - cd /opt/app && docker-compose up -d >> /var/log/cloud-init-output.log 2>&1

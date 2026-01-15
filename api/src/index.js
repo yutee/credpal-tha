@@ -9,6 +9,10 @@ let appReady = false;
 
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.json({ message: "Welcome to CredPal API" });
+});
+
 app.get("/health", (req, res) => {
   if (!appReady || !isDbConnected()) {
     return res.status(503).json({

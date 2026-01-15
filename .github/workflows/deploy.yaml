@@ -14,6 +14,9 @@ env:
 jobs:
   approval:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
     steps:
       - name: Manual Approval
         uses: trstringer/manual-approval@v1
@@ -22,6 +25,7 @@ jobs:
           approvers: ${{ github.actor }}
           minimum-approvals: 1
           issue-title: "Deploy to Production"
+          exclude-workflow-initiator-as-approver: false
           issue-body: |
             **Deployment Request**
             
