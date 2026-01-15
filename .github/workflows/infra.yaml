@@ -1,13 +1,29 @@
-name: Infrastructure Deployment
+name: Deploy Infra
 
 on:
-  # push:
-  #   branches: [main]
-  #   paths:
-  #     - 'infra/**'
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
   workflow_dispatch:
 
 jobs:
+  approval:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Manual Approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
+          issue-title: "Deploy Infra Changes"
+          issue-body: "Please approve or deny the deployment"
+          exclude-workflow-initiator-as-approver: false
+
   terraform:
     runs-on: ubuntu-latest
     

@@ -58,15 +58,20 @@ jobs:
           ssh -i ${{ env.SSH_KEY_PATH }} \
             -o StrictHostKeyChecking=no \
             ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+
+            sudo mkdir -p /opt/app
+            
+            sudo mv ~/docker-compose.yml /opt/app/docker-compose.yml
+            
+            sudo chown ubuntu:ubuntu /opt/app/docker-compose.yml
+            
             cd /opt/app
             docker-compose pull
             docker-compose up -d
-            docker-compose ps
             
             echo "Waiting for health check..."
             sleep 10
             curl -f http://localhost:3000/health || exit 1
-            echo "Deployment successful"
           EOF
 
       - name: Verify deployment

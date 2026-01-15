@@ -74,7 +74,6 @@ write_files:
       services:
         app:
           image: ghcr.io/${github_repo}:latest
-          container_name: node-app
           restart: unless-stopped
           ports:
             - "3000:3000"
@@ -89,6 +88,8 @@ write_files:
           depends_on:
             postgres:
               condition: service_healthy
+          networks:
+            - app_network
         postgres:
           image: postgres:16-alpine
           container_name: postgres
@@ -104,8 +105,13 @@ write_files:
             interval: 5s
             timeout: 5s
             retries: 5
+          networks:
+            - app_network
       volumes:
         postgres_data:
+      networks:
+        app_network:
+          driver: bridge  
 
   - path: /usr/local/bin/setup-ssl.sh
     permissions: '0755'
