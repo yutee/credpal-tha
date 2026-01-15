@@ -3,13 +3,17 @@
 package_update: true
 package_upgrade: true
 
-# COMMENT: Explicitly listing packages to ensure apt-get install runs
+apt:
+  sources:
+    docker.list:
+      source: "deb [arch=amd64 signed-by=$KEYGATEWAY] https://download.docker.com/linux/ubuntu jammy stable"
+      keyid: 7EA0A9C3F273FCD8
+
 packages:
-  - docker.io
-  - docker-compose
   - nginx
   - certbot
   - python3-certbot-nginx
+  - curl
   - git
 
 groups:
@@ -134,14 +138,29 @@ write_files:
       fi
 
 runcmd:
-  # CHANGE: Added '|| true' and log redirection to debug every step
-  - mkdir -p /var/www/html
-  - systemctl enable docker >> /var/log/cloud-init-output.log 2>&1
-  - systemctl start docker >> /var/log/cloud-init-output.log 2>&1
+# 1. Prepare Webroot for SSL
+  - mkdir -p /var/www/html/.well-known/acme-challenge
+  - chown -R www-data:www-data /var/www/html
+  - chmod -R 755 /var/www/html
+
+  # 2. Install Docker using the official convenience script (More reliable in cloud-init)
+  - curl -fsSL https://get.docker.com -o get-docker.sh
+  - sh get-docker.sh
+  - systemctl enable --now docker
+
+  # 3. Setup App Directory
+  - mkdir -p /opt/app
+  - chown -R ubuntu:ubuntu /opt/app
+
+  # 4. Configure Nginx
   - ln -sf /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app
   - rm -f /etc/nginx/sites-enabled/default
-  - systemctl enable nginx >> /var/log/cloud-init-output.log 2>&1
-  - systemctl restart nginx >> /var/log/cloud-init-output.log 2>&1
+  - systemctl restart nginx
+
+  # 5. Run SSL Setup
   - /usr/local/bin/setup-ssl.sh >> /var/log/cloud-init-output.log 2>&1
-  - cd /opt/app && docker-compose pull >> /var/log/cloud-init-output.log 2>&1
-  - cd /opt/app && docker-compose up -d >> /var/log/cloud-init-output.log 2>&1
+
+  # 6. Start the App (Using full path to ensure it's found)
+  - cd /opt/app && /usr/bin/docker compose pull >> /var/log/cloud-init-output.log 2>&1
+  - cd /opt/app && /usr/bin/docker compose up -d >> /var/log/cloud-init-output.log 2>&1
+  - chown -R ubuntu:ubuntu /opt/app

@@ -58,17 +58,14 @@ jobs:
           ssh -i ${{ env.SSH_KEY_PATH }} \
             -o StrictHostKeyChecking=no \
             ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
-            sudo mv /tmp/docker-compose.yaml /opt/app/docker-compose.yml
-            sudo chown ubuntu:ubuntu /opt/app/docker-compose.yml
-            
+
             cd /opt/app
             export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
-            
-            docker-compose pull
-            docker-compose up -d
+            sudo docker compose pull
+            sudo docker compose up -d
             
             echo "Waiting for health check..."
-            sleep 10
+            sleep 15
             curl -f http://localhost:3000/health || exit 1
           EOF
 
